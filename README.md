@@ -34,6 +34,38 @@ Values are interpolated between simulated points. Soft ML for RM(2,6) is not sho
 
 The raw numbers are in [`results/results.csv`](results/results.csv).
 
+### RPA decoding of second-order codes
+
+![RPA vs ML vs majority logic](results/bler_rpa_r2.png)
+
+Eb/N0 (dB) for block error rate 10⁻⁴, interpolated:
+
+| Code | Majority logic | Soft ML | RPA | RPA min-sum | RPA min-sum Q7.8 | Union bound |
+| --- | --- | --- | --- | --- | --- | --- |
+| RM(2,4) | 8.49 | 6.24 | 6.24 | 6.23 | 6.31 | 6.26 |
+| RM(2,5) | 7.69 | 5.17 | 5.12 | 5.13 | 5.13 | 5.15 |
+| RM(2,6) | 7.58 | — | 4.21 | 4.16 | 4.26 | 4.21 |
+
+- **RPA is effectively ML for these codes.** On RM(2,4) and RM(2,5) its curve lies on top of brute-force ML, and on RM(2,6), where brute force is out of reach, it sits on the union bound.
+- **Soft RPA beats hard majority logic by 2.2–3.4 dB** at block error rate 10⁻⁴, and the gap widens with length.
+- **Min-sum and 16-bit Q7.8 storage cost nothing measurable** here. Near 10⁻⁴ the points rest on 3–90 block errors, so differences under about 0.1 dB are noise.
+
+![RPA on RM(2,8)](results/rm28_rpa.png)
+
+RM(2,8) is the [256, 37, 64] code from the CPA hardware study. With 10,000-block caps the curves stop at 2.5 dB; the union bound carries the picture further.
+
+| Eb/N0 | 1.0 dB | 1.5 dB | 2.0 dB | 2.5 dB |
+| --- | --- | --- | --- | --- |
+| RPA, BER | 1.1×10⁻² | 3.5×10⁻³ | 6.1×10⁻⁴ | 1.2×10⁻⁴ |
+| RPA, BLER | 2.7×10⁻² | 8.4×10⁻³ | 1.6×10⁻³ | 3×10⁻⁴ (3 errors) |
+| RPA min-sum, BLER | 3.7×10⁻² | 1.2×10⁻² | 2.8×10⁻³ | 4×10⁻⁴ (4 errors) |
+| RPA min-sum Q7.8, BLER | 3.4×10⁻² | 1.1×10⁻² | 2.0×10⁻³ | 7×10⁻⁴ (7 errors) |
+| Uncoded BPSK, BER | 5.6×10⁻² | 4.7×10⁻² | 3.8×10⁻² | 3.0×10⁻² |
+
+At 1.0–1.5 dB, where the counts are large (84–219 block errors), min-sum costs about 0.1–0.15 dB against exact box-plus, and Q7.8 adds nothing beyond min-sum. Exact RPA follows the minimum-weight term of the union bound, 43,180·Q(√(2R·64·Eb/N0)), closely from 1 dB up.
+
+The RPA numbers are in [`results/results_rpa.csv`](results/results_rpa.csv), produced by `simulate_rpa.py --m 4 5 6` (seed 2026) and `simulate_rpa.py --m 8 --seed 2027`, run as two parallel jobs.
+
 ## Background
 
 RM(r, m) is the set of evaluation vectors of all Boolean polynomials in m variables of degree at most r, evaluated at the 2^m points of GF(2)^m.
@@ -56,17 +88,46 @@ The BPSK images of RM(1, m) codewords are ±(−1)^(a·x), so correlating the re
 
 Correlates with all 2^k codewords and picks the best. Used for RM(2,4) and RM(2,5) (k ≤ 16).
 
+**Recursive projection-aggregation (RPA)** — `RPADecoder` (`rmcodes/rpa.py`)
+
+The soft decoder of Ye and Abbe, *Recursive projection-aggregation decoding of Reed-Muller codes* (IEEE Trans. IT 2020, arXiv:1902.01470), Algorithms 3–4. The paper writes RM(m, r) for what this repository calls RM(r, m).
+
+- *Projection.* For a direction b ≠ 0, the cosets {z, z+b} carry the bits c(z) + c(z+b) = (D_b f)(z), the discrete derivative of the codeword polynomial f. Because deg D_b f ≤ r − 1 and D_b f is constant on each coset, the projected word is a codeword of RM(r−1, m−1) (Lemma 1 of the paper). For r = 2 this is explicit: f(z+b) + f(z) = bUzᵀ + const, with U the symmetric matrix of quadratic coefficients (eq. 8.6 of Abbe, Sberlo, Shpilka, Ye, *Reed-Muller Codes*).
+- *Projected LLR.* Any two coordinates of a uniformly random RM codeword are independent uniform bits (Lemma 2), so the LLR of c(z) + c(z+b) is the box-plus L₁ ⊞ L₂ = ln(e^(L₁+L₂) + 1) − ln(e^(L₁) + e^(L₂)) = 2 artanh(tanh(L₁/2) tanh(L₂/2)).
+- *Min-sum.* sign(L₁)sign(L₂)min(|L₁|, |L₂|) satisfies L₁ ⊞ L₂ = min-sum + ln(1 + e^(−|L₁+L₂|)) − ln(1 + e^(−|L₁−L₂|)). The correction lies in [−ln 2, ln 2] and opposes the sign of the min-sum term, so min-sum is off by at most ln 2 and always overstates reliability (checked in the tests).
+- *Recursion and aggregation.* Each of the n − 1 projections is decoded as RM(r−1, m−1), down to RM(1, ·), which uses the FHT ML decoder. Each decoded projection votes (1 − 2ŷ_b)·L(z+b) for L(z); the new LLR is the average of the n − 1 votes. This repeats up to ⌊m/2⌋ times or until every LLR moves by less than 5 %.
+- *Complexity.* O(nʳ log n) (Proposition 3). For r = 2, one round costs (n−1)·n/2 box-plus operations, (n−1)·(n/2)·log₂(n/2) FHT additions and (n−1)·n aggregation additions; for RM(2,8) that is 32,640 + 228,480 + 65,280 per round per block.
+- *Codeword symmetry.* The error probability does not depend on the transmitted codeword (Proposition 4), because every step commutes with flipping LLR signs along a codeword. This also holds for min-sum and for a fixed-point quantiser that is an odd function, which is why `make_quantizer` saturates at ±(2¹⁵ − 1), not at −2¹⁵. The tests check the symmetry directly.
+- For r = 2 there is only one recursion level, so collapsed projection-aggregation (CPA) is the same algorithm as RPA.
+
+`RPADecoder(code, min_sum=True, llr_format=(7, 8))` emulates Q7.8 storage: channel, projected and aggregated LLRs are all rounded to steps of 1/256 and saturated at ±127.996. It does not model accumulator width. In real hardware the 128-point FHT grows values by 7 bits and the 255-term aggregation sum by 8 bits, so those accumulators need about 32 bits.
+
+The decoder outputs a hard decision on the final LLRs, which need not be a codeword; it is mapped to a message with Reed's decoder (exact when the output is a codeword).
+
+## Weight distributions and the union bound
+
+`rmcodes/bounds.py` gives an ML benchmark that needs no simulation.
+
+- Minimum-weight codewords of RM(r, m) are the indicators of (m−r)-flats, and there are A_d = 2^r ∏_{i=0}^{m−r−1} (2^(m−i) − 1)/(2^(m−r−i) − 1) of them. For RM(2,8), A₆₄ = 43,180.
+- For r = 2 the full distribution is Sloane–Berlekamp: a quadratic form of rank 2h has weight 2^(m−1) ± 2^(m−1−h), and each of these weights occurs 2^(h(h+1)) ∏_{i=m−2h+1}^{m}(2^i − 1) / ∏_{i=1}^{h}(4^i − 1) times. The tests check this against exhaustive enumeration for m = 3…6.
+- Union bound on ML block error rate over BPSK/AWGN: P_B ≤ Σ_w A_w Q(√(2R·w·Eb/N0)). Keeping only w = d gives the truncated bound, a close estimate of ML performance at high SNR.
+
 ## Repository layout
 
 ```
 rmcodes/
 ├── code.py        # ReedMullerCode: parameters, generator matrix, encoder
-└── decoders.py    # majority-logic, FHT-based ML, brute-force ML
+├── decoders.py    # majority-logic, FHT-based ML, brute-force ML
+├── rpa.py         # RPA decoder, box-plus / min-sum, fixed-point emulation
+└── bounds.py      # weight distributions, union bounds
 scripts/
 ├── simulate.py    # Monte Carlo BER/BLER simulation -> results/results.csv
-└── plot.py        # results/*.png
+├── simulate_rpa.py# RPA simulation for RM(2,4..6) and RM(2,8) -> results/results_rpa.csv
+├── plot.py        # results/ber_*.png, bler_all.png
+└── plot_rpa.py    # results/bler_rpa_r2.png, rm28_rpa.png
 tests/
-└── test_rm.py     # parameters, minimum distance, error-correction guarantee, ML checks
+├── test_rm.py     # parameters, minimum distance, error-correction guarantee, ML checks
+└── test_rpa_bounds.py # box-plus bounds, quantiser, weight distributions, RPA checks
 results/           # CSV and plots from the run above
 ```
 
@@ -75,16 +136,21 @@ results/           # CSV and plots from the run above
 ```bash
 pip install -r requirements.txt
 
-python -m pytest tests                       # 27 tests, under a second
+python -m pytest tests                       # 55 tests, about 20 seconds
 PYTHONPATH=. python scripts/simulate.py      # full simulation, a few minutes
 PYTHONPATH=. python scripts/simulate.py --quick
 PYTHONPATH=. python scripts/plot.py
+
+PYTHONPATH=. python scripts/simulate_rpa.py  # RPA runs; RM(2,8) is the slow part
+PYTHONPATH=. python scripts/simulate_rpa.py --m 4 5 --quick
+PYTHONPATH=. python scripts/plot_rpa.py
 ```
 
 `simulate.py` options include `--ebn0 START STOP STEP`, `--target-errors`, `--max-blocks` and `--seed`. Results are reproducible with the default seed.
 
 ## Possible extensions
 
-- Recursive (Dumer / Plotkin-structure) soft decoding, to get near-ML soft decoding for RM(2,6) and longer codes
+- RPA for r ≥ 3 (implemented and tested, but slow in NumPy), RPA list decoding, and Dumer's recursive (Plotkin-structure) decoding for comparison
+- Hard-decision ML (minimum Hamming distance) decoding, to separate the soft-vs-hard gain from the majority-logic loss
 - Successive-cancellation and list decoding, and the connection to polar codes
 - Comparison with BCH and polar codes of similar length and rate

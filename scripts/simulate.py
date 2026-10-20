@@ -57,7 +57,7 @@ def main():
     p.add_argument("--ebn0", type=float, nargs=3, default=[0.0, 10.0, 0.5],
                    metavar=("START", "STOP", "STEP"))
     p.add_argument("--target-errors", type=int, default=300)
-    p.add_argument("--max-blocks", type=int, default=2_000_000)
+    p.add_argument("--max-blocks", type=int, default=1_000_000)
     p.add_argument("--max-blocks-bruteforce", type=int, default=200_000)
     p.add_argument("--min-ber", type=float, default=1e-6,
                    help="stop a curve once BER falls below this")
