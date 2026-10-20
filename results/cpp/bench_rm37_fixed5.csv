@@ -1,0 +1,6 @@
+scheme,code,n,k,decoder,ebn0_db,blocks,block_errors,bler,seconds
+RM,RM(3.7),128,64,rpa_fixed5_rms2.0,1.50,512,77,1.503906e-01,8.8
+RM,RM(3.7),128,64,rpa_fixed5_rms2.0,2.00,1536,57,3.710938e-02,23.4
+RM,RM(3.7),128,64,rpa_fixed5_rms2.0,2.50,4096,51,1.245117e-02,54.7
+RM,RM(3.7),128,64,rpa_fixed5_rms2.0,3.00,21248,50,2.353163e-03,253.3
+RM,RM(3.7),128,64,rpa_fixed5_rms2.0,3.50,107776,50,4.639252e-04,1229.4

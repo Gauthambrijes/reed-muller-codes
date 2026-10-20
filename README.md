@@ -66,6 +66,55 @@ At 1.0–1.5 dB, where the counts are large (84–219 block errors), min-sum cos
 
 The RPA numbers are in [`results/results_rpa.csv`](results/results_rpa.csv), produced by `simulate_rpa.py --m 4 5 6` (seed 2026) and `simulate_rpa.py --m 8 --seed 2027`, run as two parallel jobs.
 
+### Fixed-point RPA: provable word lengths
+
+Statements and proofs are in [`docs/theory.md`](docs/theory.md). In summary:
+
+- **Theorem 1 (scale invariance).** Min-sum RPA gives the same decisions for L and cL, c > 0. So the receiver needs no noise-variance estimate (it can quantise y directly), and *normalised* min-sum is identical to plain min-sum for RPA.
+- **Theorem 2 (codeword symmetry).** With an odd quantiser, symmetric rounding and random tie-breaking, the integer decoder's error probability does not depend on the transmitted codeword. Without random tie-breaking it does, because integer FHT spectra tie with positive probability.
+- **Theorem 3 (word lengths).** For min-sum RPA on RM(r, m) with b-bit stored LLRs and shift-by-m renormalisation, b bits of storage, b + m − r + 1 bits for the FHT and b + m bits for the aggregation accumulator are enough for every input. A worst-case input reaches every bound, so for b ≥ 3 no width can be reduced.
+
+`cpp/sim width` checks this (`results/cpp/width_check.txt`; the tests assert it):
+
+| Code, storage | FHT bound / bits | Aggregation bound / bits | Largest seen on noisy inputs |
+| --- | --- | --- | --- |
+| RM(2,8), 5-bit | 1,920 / 12 | 3,825 / 13 | 1,024 and 2,040 |
+| RM(2,8), 6-bit | 3,968 / 13 | 7,905 / 14 | 1,953 and 4,015 |
+| RM(3,7), 5-bit | 480 / 10 | 1,905 / 12 | 288 and 1,143 |
+| RM(2,8), 16-bit (Q7.8) | 4,194,176 / 23 | 8,355,585 / 24 | 2,228,761 and 4,509,910 |
+
+So a 5- or 6-bit min-sum RPA decoder for RM(2,8) runs entirely in 16-bit integer arithmetic with no overflow handling, while 16-bit Q7.8 storage forces 32-bit accumulators.
+
+![Storage width and clipping](results/fixed_point_sweep.png)
+
+On RM(2,7), 5-bit storage matches floating-point min-sum within the simulation noise, 4 bits costs about 0.1 dB and 3 bits about 0.3 dB (converted from the BLER ratios using the local slope of the curve). Clipping at about 2× the received RMS (what an AGC measures) works for all three codes.
+
+### Short-packet benchmark against polar codes and finite-blocklength bounds
+
+All runs use the C++ engine (`cpp/`). Each RM code is compared with a CRC-aided polar code of the same (n, k): Gaussian-approximation construction, CRC length chosen by a sweep (CRC-6 was best for all three, `results/cpp/polar_crc_sweep.csv`), and SCL decoding with list size 32. The bounds are for the BI-AWGN channel with uniform inputs, computed rigorously on a lattice (`rmcodes/fbl.py`, checked against Monte Carlo in the tests).
+
+![Short-packet benchmark](results/benchmark_bler.png)
+
+Eb/N0 (dB) for block error rate 10⁻³, and for 10⁻⁴ where the simulations reach it:
+
+| (n, k) | Meta-converse | Normal approx. | RCU_s | Polar CRC-SCL32 | RM, RPA exact | RM, RPA min-sum | RM, 5-bit integer | RM, 4-bit integer |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| (128, 29), 10⁻³ | 1.96 | 2.50 | 2.85 | 2.82 | **2.81** | 2.91 | 2.86 | 2.90 |
+| (128, 29), 10⁻⁴ | 2.52 | 3.17 | 3.43 | 3.72 | **3.48** | 3.56 | 3.57 | 3.63 |
+| (256, 37), 10⁻³ | 1.50 | 1.99 | 2.16 | **2.19** | 2.21 | 2.28 | 2.30 | 2.47 |
+| (256, 37), 10⁻⁴ | 2.01 | 2.63 | 2.69 | 2.83 | **2.80** | 2.89 | 2.94 | — |
+| (128, 64), 10⁻³ | 2.25 | 2.48 | 2.90 | **3.13** | 3.19 | 3.28 | 3.26 | 3.33 |
+
+Findings:
+
+- **Low rate, n = 128.** RM(2,7) with RPA ties the polar code at 10⁻³ and is 0.24 dB better at 10⁻⁴: its curve is steeper (d = 32). It stays within 0.05 dB of the random-coding RCU_s bound at both error rates.
+- **(256, 37).** RM(2,8) and the polar code are within 0.03 dB at both error rates.
+- **Rate ½.** Plain RPA on RM(3,7) is about 0.06 dB behind the polar code at 10⁻³, within the statistical precision of these runs (50 block errors). RPA list decoding, not implemented here, is the known fix.
+- **Hardware variants.** Min-sum costs 0.07–0.1 dB. 5-bit integer storage adds nothing measurable beyond that on RM(2,7) and RM(3,7), and about 0.02–0.05 dB on RM(2,8). 4 bits is enough at n = 128 but costs about 0.2 dB on RM(2,8), whose per-symbol SNR is lowest.
+- **The normal approximation is a poor reference at low rate.** At (128, 29) it sits 0.54 dB above the rigorous meta-converse, so gaps quoted to the normal approximation alone overstate how far a code is from optimal. The table reports both.
+
+Precision: each point stops at 100 block errors (50 for RM(3,7)) or at its block cap; `results/benchmark_table.csv` lists the error counts at the points bracketing each crossing. The table's simulated values are log-linear interpolations; differences under about 0.05 dB are not significant.
+
 ## Background
 
 RM(r, m) is the set of evaluation vectors of all Boolean polynomials in m variables of degree at most r, evaluated at the 2^m points of GF(2)^m.
@@ -100,7 +149,7 @@ The soft decoder of Ye and Abbe, *Recursive projection-aggregation decoding of R
 - *Codeword symmetry.* The error probability does not depend on the transmitted codeword (Proposition 4), because every step commutes with flipping LLR signs along a codeword. This also holds for min-sum and for a fixed-point quantiser that is an odd function, which is why `make_quantizer` saturates at ±(2¹⁵ − 1), not at −2¹⁵. The tests check the symmetry directly.
 - For r = 2 there is only one recursion level, so collapsed projection-aggregation (CPA) is the same algorithm as RPA.
 
-`RPADecoder(code, min_sum=True, llr_format=(7, 8))` emulates Q7.8 storage: channel, projected and aggregated LLRs are all rounded to steps of 1/256 and saturated at ±127.996. It does not model accumulator width. In real hardware the 128-point FHT grows values by 7 bits and the 255-term aggregation sum by 8 bits, so those accumulators need about 32 bits.
+`RPADecoder(code, min_sum=True, llr_format=(7, 8))` emulates Q7.8 storage: channel, projected and aggregated LLRs are all rounded to steps of 1/256 and saturated at ±127.996. It does not model accumulator width; the integer decoder in `cpp/` does, and Theorem 3 of [`docs/theory.md`](docs/theory.md) shows that Q7.8 storage needs 23-bit FHT and 24-bit aggregation accumulators for RM(2,8).
 
 The decoder outputs a hard decision on the final LLRs, which need not be a codeword; it is mapped to a message with Reed's decoder (exact when the output is a codeword).
 
@@ -119,16 +168,30 @@ rmcodes/
 ├── code.py        # ReedMullerCode: parameters, generator matrix, encoder
 ├── decoders.py    # majority-logic, FHT-based ML, brute-force ML
 ├── rpa.py         # RPA decoder, box-plus / min-sum, fixed-point emulation
-└── bounds.py      # weight distributions, union bounds
+├── bounds.py      # weight distributions, union bounds
+└── fbl.py         # finite-blocklength bounds: meta-converse, normal approx., RCU_s, DT
+cpp/
+├── rm.hpp         # RM encoder (same conventions as rmcodes/code.py)
+├── rpa.hpp        # float RPA (exact / min-sum) and integer min-sum RPA with width tracking
+├── polar.hpp      # CRC-aided polar codes: GA construction, SCL decoder
+├── sim.cpp        # Monte Carlo driver, width checker, decoder for cross-checks
+└── Makefile
+docs/
+└── theory.md      # theorems and proofs (scale invariance, symmetry, word lengths, bounds)
 scripts/
 ├── simulate.py    # Monte Carlo BER/BLER simulation -> results/results.csv
 ├── simulate_rpa.py# RPA simulation for RM(2,4..6) and RM(2,8) -> results/results_rpa.csv
 ├── plot.py        # results/ber_*.png, bler_all.png
-└── plot_rpa.py    # results/bler_rpa_r2.png, rm28_rpa.png
+├── plot_rpa.py    # results/bler_rpa_r2.png, rm28_rpa.png
+├── run_cpp_benchmark.sh # C++ short-packet benchmark -> results/cpp/bench_*.csv
+├── fbl_benchmark.py     # bounds -> results/fbl_thresholds.csv, fbl_curves.csv
+└── plot_benchmark.py    # results/benchmark_bler.png, fixed_point_sweep.png, benchmark_table.csv
 tests/
 ├── test_rm.py     # parameters, minimum distance, error-correction guarantee, ML checks
-└── test_rpa_bounds.py # box-plus bounds, quantiser, weight distributions, RPA checks
-results/           # CSV and plots from the run above
+├── test_rpa_bounds.py # box-plus bounds, quantiser, weight distributions, RPA checks
+├── test_fbl.py    # Shannon-limit check, bounds vs Monte Carlo, bound ordering
+└── test_cpp.py    # C++ vs Python decisions, proven word lengths never exceeded and attained
+results/           # CSV and plots from the runs above
 ```
 
 ## Running it
@@ -136,7 +199,7 @@ results/           # CSV and plots from the run above
 ```bash
 pip install -r requirements.txt
 
-python -m pytest tests                       # 55 tests, about 20 seconds
+python -m pytest tests                       # 68 tests, under a minute (builds cpp/sim)
 PYTHONPATH=. python scripts/simulate.py      # full simulation, a few minutes
 PYTHONPATH=. python scripts/simulate.py --quick
 PYTHONPATH=. python scripts/plot.py
@@ -144,13 +207,21 @@ PYTHONPATH=. python scripts/plot.py
 PYTHONPATH=. python scripts/simulate_rpa.py  # RPA runs; RM(2,8) is the slow part
 PYTHONPATH=. python scripts/simulate_rpa.py --m 4 5 --quick
 PYTHONPATH=. python scripts/plot_rpa.py
+
+make -C cpp                                  # C++ engine (g++ with C++17)
+cpp/sim rpa --r 2 --m 8 --dec fixed --bits 5 --clip-rms 2.0 --ebn0 1,2 --target 100
+cpp/sim width --r 2 --m 8 --bits 5 --ebn0 1,2,3   # proven vs observed word lengths
+scripts/run_cpp_benchmark.sh all             # short-packet benchmark, ~3 h on 2 cores
+PYTHONPATH=. python scripts/fbl_benchmark.py # finite-blocklength bounds, ~15 min
+PYTHONPATH=. python scripts/plot_benchmark.py
 ```
 
 `simulate.py` options include `--ebn0 START STOP STEP`, `--target-errors`, `--max-blocks` and `--seed`. Results are reproducible with the default seed.
 
 ## Possible extensions
 
-- RPA for r ≥ 3 (implemented and tested, but slow in NumPy), RPA list decoding, and Dumer's recursive (Plotkin-structure) decoding for comparison
+- RPA list decoding (Ye–Abbe Section III), which should close most of the RM(3,7) gap to the bounds, and Dumer's recursive (Plotkin-structure) decoding for comparison
 - Hard-decision ML (minimum Hamming distance) decoding, to separate the soft-vs-hard gain from the majority-logic loss
-- Successive-cancellation and list decoding, and the connection to polar codes
-- Comparison with BCH and polar codes of similar length and rate
+- Offset min-sum: by Theorem 1 in `docs/theory.md`, only non-homogeneous corrections can change min-sum RPA decisions
+- Running the integer decoder on a microcontroller (Cortex-M0/M4) and measuring latency, energy and memory
+- Comparison with BCH and with 5G NR polar codes (5G reliability sequence and rate matching)

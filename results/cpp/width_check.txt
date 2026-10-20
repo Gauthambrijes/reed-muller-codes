@@ -1,0 +1,32 @@
+# RM(2,7), b=5
+level_m,quantity,bound,bound_bits,observed_adversarial,observed_random,observed_bits
+7,store,15,5,15,15,5
+7,aggregate,1905,12,1905,1143,12
+6,store,15,5,15,15,5
+6,fht,960,11,960,576,11
+# RM(2,8), b=5
+level_m,quantity,bound,bound_bits,observed_adversarial,observed_random,observed_bits
+8,store,15,5,15,15,5
+8,aggregate,3825,13,3825,2040,13
+7,store,15,5,15,15,5
+7,fht,1920,12,1920,1024,12
+# RM(2,8), b=6
+level_m,quantity,bound,bound_bits,observed_adversarial,observed_random,observed_bits
+8,store,31,6,31,31,6
+8,aggregate,7905,14,7905,4015,14
+7,store,31,6,31,31,6
+7,fht,3968,13,3968,1953,13
+# RM(3,7), b=5
+level_m,quantity,bound,bound_bits,observed_adversarial,observed_random,observed_bits
+7,store,15,5,15,15,5
+7,aggregate,1905,12,1905,1143,12
+6,store,15,5,15,15,5
+6,aggregate,945,11,945,567,11
+5,store,15,5,15,15,5
+5,fht,480,10,480,288,10
+# RM(2,8), b=16
+level_m,quantity,bound,bound_bits,observed_adversarial,observed_random,observed_bits
+8,store,32767,16,32767,32767,16
+8,aggregate,8355585,24,8355585,4509910,24
+7,store,32767,16,32767,32767,16
+7,fht,4194176,23,4194176,2228761,23

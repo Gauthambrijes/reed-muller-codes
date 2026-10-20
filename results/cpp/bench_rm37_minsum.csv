@@ -1,0 +1,6 @@
+scheme,code,n,k,decoder,ebn0_db,blocks,block_errors,bler,seconds
+RM,RM(3.7),128,64,rpa_minsum,1.50,512,60,1.171875e-01,9.0
+RM,RM(3.7),128,64,rpa_minsum,2.00,1280,54,4.218750e-02,19.9
+RM,RM(3.7),128,64,rpa_minsum,2.50,5120,50,9.765625e-03,66.7
+RM,RM(3.7),128,64,rpa_minsum,3.00,14336,50,3.487723e-03,161.1
+RM,RM(3.7),128,64,rpa_minsum,3.50,129792,50,3.852318e-04,1297.8
