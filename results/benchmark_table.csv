@@ -1,0 +1,25 @@
+n,k,code,scheme,ebn0_at_1e-3,gap_to_normal_approx_db,errors_bracketing_1e-3,ebn0_at_1e-4,errors_bracketing_1e-4
+128,29,"RM(2,7)","Polar + CRC-6, SCL-32",2.82,0.32,"(101, 100)",3.72,"(100, 91)"
+128,29,"RM(2,7)","RM, RPA exact (float)",2.81,0.3,"(100, 100)",3.48,"(100, 92)"
+128,29,"RM(2,7)","RM, RPA min-sum (float)",2.91,0.41,"(101, 100)",3.56,"(100, 41)"
+128,29,"RM(2,7)","RM, RPA min-sum, 5-bit integer",2.86,0.36,"(101, 101)",3.57,"(100, 35)"
+128,29,"RM(2,7)","RM, RPA min-sum, 4-bit integer",2.9,0.4,"(101, 101)",3.63,"(100, 48)"
+128,29,"RM(2,7)",Meta-converse (any code),1.961,-0.54,,2.515,
+128,29,"RM(2,7)",Normal approximation,2.503,0.0,,3.166,
+128,29,"RM(2,7)",RCU-s bound (random codes),2.846,0.34,,3.429,
+256,37,"RM(2,8)","Polar + CRC-6, SCL-32",2.19,0.2,"(103, 100)",2.83,"(100, 100)"
+256,37,"RM(2,8)","RM, RPA exact (float)",2.21,0.22,"(100, 100)",2.8,"(100, 17)"
+256,37,"RM(2,8)","RM, RPA min-sum (float)",2.28,0.3,"(102, 100)",2.89,"(100, 53)"
+256,37,"RM(2,8)","RM, RPA min-sum, 5-bit integer",2.3,0.32,"(101, 101)",2.94,"(101, 63)"
+256,37,"RM(2,8)","RM, RPA min-sum, 4-bit integer",2.47,0.49,"(102, 100)",,
+256,37,"RM(2,8)",Meta-converse (any code),1.496,-0.49,,2.014,
+256,37,"RM(2,8)",Normal approximation,1.985,0.0,,2.629,
+256,37,"RM(2,8)",RCU-s bound (random codes),2.164,0.18,,2.685,
+128,64,"RM(3,7)","Polar + CRC-6, SCL-32",3.13,0.65,"(101, 102)",,
+128,64,"RM(3,7)","RM, RPA exact (float)",3.19,0.72,"(50, 13)",,
+128,64,"RM(3,7)","RM, RPA min-sum (float)",3.28,0.81,"(50, 50)",,
+128,64,"RM(3,7)","RM, RPA min-sum, 5-bit integer",3.26,0.79,"(50, 50)",,
+128,64,"RM(3,7)","RM, RPA min-sum, 4-bit integer",3.33,0.85,"(50, 50)",,
+128,64,"RM(3,7)",Meta-converse (any code),2.249,-0.23,,2.667,
+128,64,"RM(3,7)",Normal approximation,2.477,0.0,,2.919,
+128,64,"RM(3,7)",RCU-s bound (random codes),2.896,0.42,,3.359,
